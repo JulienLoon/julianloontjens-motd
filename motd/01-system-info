@@ -7,6 +7,7 @@ BOLD="\033[1m"
 YELLOW="\033[33m"
 RESET="\033[0m"
 
+# --- Basic system info ---
 [ -r /etc/lsb-release ] && . /etc/lsb-release
 if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
     DISTRIB_DESCRIPTION=$(lsb_release -s -d)
@@ -18,12 +19,12 @@ LOAD=$(awk '{print $1", "$2", "$3}' /proc/loadavg)
 KERNEL=$(uname -r)
 DATE=$(date +"%A %d %B %Y, %H:%M")
 LOCAL_IP=$(hostname -I | awk '{print $1}')
-EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null)
+EXTERNAL_IP=$(curl -s https://ifconfig.me || echo "N/A")
 
+TEMP="N/A"
 if command -v sensors >/dev/null 2>&1; then
-    TEMP=$(sensors | grep -m 1 '°C' | awk '{print $2}')
-else
-    TEMP="N/A"
+    TEMP_LINE=$(sensors | grep -m1 -E '°C')
+    [ -n "$TEMP_LINE" ] && TEMP=$(echo "$TEMP_LINE" | grep -oE '[0-9]+\.[0-9]+°C')
 fi
 
 echo -e "  Distribution: ${YELLOW}${DISTRIB_DESCRIPTION}${RESET}"
@@ -34,4 +35,20 @@ echo -e "  Kernel:       ${YELLOW}${KERNEL}${RESET}"
 echo -e "  Date:         ${YELLOW}${DATE}${RESET}"
 echo -e "  Local IP:     ${YELLOW}${LOCAL_IP}${RESET}"
 echo -e "  External IP:  ${YELLOW}${EXTERNAL_IP}${RESET}"
-echo -e "  Temperature:  ${YELLOW}${TEMP}${RESET}\n"
+echo -e "  Temperature:  ${YELLOW}${TEMP}${RESET}"
+
+# --- Append Landscape-like info in same format ---
+if command -v landscape-sysinfo >/dev/null 2>&1; then
+    INFO=$(/usr/bin/landscape-sysinfo 2>/dev/null)
+    if [ -n "$INFO" ]; then
+        echo ""
+        echo "$INFO" | while IFS= read -r line; do
+            label=$(echo "$line" | cut -d':' -f1)
+            value=$(echo "$line" | cut -d':' -f2-)
+            if [ -n "$label" ] && [ -n "$value" ]; then
+                printf "  %-13s %b%s%b\n" "${label}:" "${YELLOW}" "$(echo "$value" | xargs)" "${RESET}"
+            fi
+        done
+        echo ""
+    fi
+fi

@@ -18,5 +18,4 @@ cat << "EOF"
 \____/\____/_____/___/_/  |_/_/ |_/  /_____/\____/\____/_/ |_/ /_/\____/_____/_/ |_//____/ 
 EOF
 
-echo -e "${RESET}${BOLD}"
-echo -e "Welcome to ${CYAN}${HOSTNAME}${RESET}${BOLD} ($(uname -o) $(uname -r) $(uname -m))${RESET}\n"
+echo -e "${RESET}${BOLD}Welcome to ${CYAN}${HOSTNAME}${RESET}${BOLD} ($(uname -o) $(uname -r) $(uname -m))${RESET}\n"
