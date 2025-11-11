@@ -1,0 +1,29 @@
+#!/bin/bash
+# /etc/update-motd.d/02-resources
+# Memory, swap, disk, processes, users
+
+RED="\033[31m"
+WHITE="\033[37m"
+RESET="\033[0m"
+
+MEM_USED=$(free -m | awk '/Mem:/ {printf "%.0f", $3/$2*100}')
+SWAP_USED=$(free -m | awk '/Swap:/ {printf "%.0f", $3/$2*100}')
+DISK_USED=$(df -h / | awk 'NR==2 {print $5 " of " $2}')
+USERS=$(who | wc -l)
+PROCS=$(ps -e --no-headers | wc -l)
+
+declare -A RESOURCES
+RESOURCES["Memory usage"]="$MEM_USED%"
+RESOURCES["Swap usage"]="$SWAP_USED%"
+RESOURCES["Usage of /"]="$DISK_USED"
+RESOURCES["Processes"]="$PROCS"
+RESOURCES["Users logged in"]="$USERS"
+
+# Dynamic alignment
+MAXLEN=0
+for label in "${!RESOURCES[@]}"; do
+    [ ${#label} -gt $MAXLEN ] && MAXLEN=${#label}
+done
+
+for label in "${!RESOURCES[@]}"; do
+    printf "  ${RED}%-${MAXLEN}s${WHITE} %s${RESET}\

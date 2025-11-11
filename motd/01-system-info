@@ -1,15 +1,14 @@
 #!/bin/bash
-#
 # /etc/update-motd.d/01-system-info
-# System details: distro, uptime, load, IPs, temperature
+# Distribution, uptime, load, kernel, date
 
-BOLD="\033[1m"
-YELLOW="\033[33m"
+RED="\033[31m"
+WHITE="\033[37m"
 RESET="\033[0m"
 
-# --- Basic system info ---
+# --- Fetch system info ---
 [ -r /etc/lsb-release ] && . /etc/lsb-release
-if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
+if [ -z "$DISTRIB_DESCRIPTION" ] && command -v lsb_release >/dev/null 2>&1; then
     DISTRIB_DESCRIPTION=$(lsb_release -s -d)
 fi
 
@@ -27,28 +26,25 @@ if command -v sensors >/dev/null 2>&1; then
     [ -n "$TEMP_LINE" ] && TEMP=$(echo "$TEMP_LINE" | grep -oE '[0-9]+\.[0-9]+°C')
 fi
 
-echo -e "  Distribution: ${YELLOW}${DISTRIB_DESCRIPTION}${RESET}"
-echo -e "  Hostname:     ${YELLOW}${HOSTNAME}${RESET}"
-echo -e "  Uptime:       ${YELLOW}${UPTIME}${RESET}"
-echo -e "  Load:         ${YELLOW}${LOAD}${RESET}"
-echo -e "  Kernel:       ${YELLOW}${KERNEL}${RESET}"
-echo -e "  Date:         ${YELLOW}${DATE}${RESET}"
-echo -e "  Local IP:     ${YELLOW}${LOCAL_IP}${RESET}"
-echo -e "  External IP:  ${YELLOW}${EXTERNAL_IP}${RESET}"
-echo -e "  Temperature:  ${YELLOW}${TEMP}${RESET}"
+# --- Prepare label/value array ---
+declare -A SYSINFO
+SYSINFO["Distribution"]="$DISTRIB_DESCRIPTION"
+SYSINFO["Hostname"]="$HOSTNAME"
+SYSINFO["Uptime"]="$UPTIME"
+SYSINFO["Load"]="$LOAD"
+SYSINFO["Kernel"]="$KERNEL"
+SYSINFO["Date"]="$DATE"
+SYSINFO["Local IP"]="$LOCAL_IP"
+SYSINFO["External IP"]="$EXTERNAL_IP"
+SYSINFO["Temperature"]="$TEMP"
 
-# --- Append Landscape-like info in same format ---
-if command -v landscape-sysinfo >/dev/null 2>&1; then
-    INFO=$(/usr/bin/landscape-sysinfo 2>/dev/null)
-    if [ -n "$INFO" ]; then
-        echo ""
-        echo "$INFO" | while IFS= read -r line; do
-            label=$(echo "$line" | cut -d':' -f1)
-            value=$(echo "$line" | cut -d':' -f2-)
-            if [ -n "$label" ] && [ -n "$value" ]; then
-                printf "  %-13s %b%s%b\n" "${label}:" "${YELLOW}" "$(echo "$value" | xargs)" "${RESET}"
-            fi
-        done
-        echo ""
-    fi
-fi
+# --- Compute longest label ---
+MAXLEN=0
+for label in "${!SYSINFO[@]}"; do
+    [ ${#label} -gt $MAXLEN ] && MAXLEN=${#label}
+done
+
+# --- Print aligned ---
+for label in "${!SYSINFO[@]}"; do
+    printf "  ${RED}%-${MAXLEN}s${WHITE} %s${RESET}\n" "$label:" "${SYSINFO[$label]}"
+done

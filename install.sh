@@ -3,7 +3,7 @@
 # install.sh – Installer for julianloontjens-motd
 # GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.1
+# Version: 1.2
 
 set -e
 
@@ -68,15 +68,20 @@ echo -e "${YELLOW}→ Copying new MOTD files...${RESET}"
 cp -a "$MOTD_SRC"/* "$MOTD_DEST"/
 sleep 0.5
 
-# --- Set permissions ---
-echo -e "${YELLOW}→ Setting permissions...${RESET}"
+# --- Set permissions on your files ---
+echo -e "${YELLOW}→ Setting permissions on new files...${RESET}"
 chmod 755 "$MOTD_DEST"/*
 chown root:root "$MOTD_DEST"/*
 
-# --- Disable default Ubuntu components ---
-echo -e "${YELLOW}→ Disabling default MOTD components...${RESET}"
-for f in 10-help-text 50-motd-news 80-livepatch 90-updates-available 91-release-upgrade 95-hwe-eol; do
-    [ -f "$MOTD_DEST/$f" ] && chmod -x "$MOTD_DEST/$f" 2>/dev/null || true
+# --- Disable all other MOTD scripts that are not yours ---
+echo -e "${YELLOW}→ Disabling other MOTD scripts not part of your package...${RESET}"
+for f in "$MOTD_DEST"/*; do
+    BASENAME=$(basename "$f")
+    # Check if this file exists in your source directory
+    if [ ! -f "$MOTD_SRC/$BASENAME" ]; then
+        chmod -x "$f" 2>/dev/null || true
+        echo "   Disabled $BASENAME"
+    fi
 done
 
 # --- Done ---

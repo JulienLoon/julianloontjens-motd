@@ -1,0 +1,27 @@
+#!/bin/bash
+# /etc/update-motd.d/03-network
+# IPv4 & IPv6 addresses
+
+RED="\033[31m"
+WHITE="\033[37m"
+RESET="\033[0m"
+
+declare -A NETINFO
+
+for IFACE in $(ip -o link show | awk -F': ' '{print $2}'); do
+    IPV4=$(ip -4 addr show "$IFACE" | awk '/inet / {print $2}' | cut -d/ -f1)
+    IPV6=$(ip -6 addr show "$IFACE" | awk '/inet6 / {print $2}' | cut -d/ -f1)
+    [ -n "$IPV4" ] && NETINFO["IPv4 $IFACE"]="$IPV4"
+    [ -n "$IPV6" ] && NETINFO["IPv6 $IFACE"]="$IPV6"
+done
+
+# Compute longest label
+MAXLEN=0
+for label in "${!NETINFO[@]}"; do
+    [ ${#label} -gt $MAXLEN ] && MAXLEN=${#label}
+done
+
+# Print aligned
+for label in "${!NETINFO[@]}"; do
+    printf "  ${RED}%-${MAXLEN}s${WHITE} %s${RESET}\n" "$label:" "${NETINFO[$label]}"
+done

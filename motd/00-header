@@ -1,7 +1,6 @@
 #!/bin/bash
-#
 # /etc/update-motd.d/00-header
-# Banner + welcome line (hostname)
+# Banner + welcome line
 
 CYAN="\033[36m"
 BOLD="\033[1m"
@@ -17,5 +16,6 @@ cat << "EOF"
 / /_/ / /_/ / /____/ // ___ |/ /|  /  / /___/ /_/ / /_/ / /|  / / / /_/ / /___/ /|  /___/ / 
 \____/\____/_____/___/_/  |_/_/ |_/  /_____/\____/\____/_/ |_/ /_/\____/_____/_/ |_//____/ 
 EOF
+echo -e "\n"
 
-echo -e "${RESET}${BOLD}Welcome to ${CYAN}${HOSTNAME}${RESET}${BOLD} ($(uname -o) $(uname -r) $(uname -m))${RESET}\n"
+echo -e "${BOLD}Welcome to ${CYAN}${HOSTNAME}${RESET}${BOLD} ($(uname -o) $(uname -r) $(uname -m))${RESET}\n"
