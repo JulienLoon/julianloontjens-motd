@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# /etc/update-motd.d/01-system-info
+# System details: distro, uptime, load, IPs, temperature
+
+BOLD="\033[1m"
+YELLOW="\033[33m"
+RESET="\033[0m"
+
+[ -r /etc/lsb-release ] && . /etc/lsb-release
+if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
+    DISTRIB_DESCRIPTION=$(lsb_release -s -d)
+fi
+
+HOSTNAME=$(hostname)
+UPTIME=$(uptime -p | sed 's/up //')
+LOAD=$(awk '{print $1", "$2", "$3}' /proc/loadavg)
+KERNEL=$(uname -r)
+DATE=$(date +"%A %d %B %Y, %H:%M")
+LOCAL_IP=$(hostname -I | awk '{print $1}')
+EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null)
+
+if command -v sensors >/dev/null 2>&1; then
+    TEMP=$(sensors | grep -m 1 '°C' | awk '{print $2}')
+else
+    TEMP="N/A"
+fi
+
+echo -e "  Distribution: ${YELLOW}${DISTRIB_DESCRIPTION}${RESET}"
+echo -e "  Hostname:     ${YELLOW}${HOSTNAME}${RESET}"
+echo -e "  Uptime:       ${YELLOW}${UPTIME}${RESET}"
+echo -e "  Load:         ${YELLOW}${LOAD}${RESET}"
+echo -e "  Kernel:       ${YELLOW}${KERNEL}${RESET}"
+echo -e "  Date:         ${YELLOW}${DATE}${RESET}"
+echo -e "  Local IP:     ${YELLOW}${LOCAL_IP}${RESET}"
+echo -e "  External IP:  ${YELLOW}${EXTERNAL_IP}${RESET}"
+echo -e "  Temperature:  ${YELLOW}${TEMP}${RESET}\n"

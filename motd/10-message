@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# /etc/update-motd.d/10-message
+# Closing message or admin note
+
+CYAN="\033[36m"
+RESET="\033[0m"
+
+echo -e "  ${CYAN}All systems nominal... or pretending to be.${RESET}"
+echo -e "  Take a breath. Check the logs. Maybe grab a tea.\n"
