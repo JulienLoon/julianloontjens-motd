@@ -13,19 +13,19 @@ USERS=$(who | wc -l)
 PROCS=$(ps -e --no-headers | wc -l)
 
 declare -A RESOURCES
+RESOURCES["Users logged in"]="$USERS"
 RESOURCES["Memory usage"]="$MEM_USED%"
-RESOURCES["Swap usage"]="$SWAP_USED%"
 RESOURCES["Usage of /"]="$DISK_USED"
 RESOURCES["Processes"]="$PROCS"
-RESOURCES["Users logged in"]="$USERS"
+RESOURCES["Swap usage"]="$SWAP_USED%"
 
-# Compute longest label
+# Bereken langste label voor uitlijning
 MAXLEN=0
 for label in "${!RESOURCES[@]}"; do
     [ ${#label} -gt $MAXLEN ] && MAXLEN=${#label}
 done
 
-# Print aligned safely
+# Print met kleuren correct
 for label in "${!RESOURCES[@]}"; do
-    printf '  %s%-*s%s %s%s\n' "$RED" "$MAXLEN" "$label:" "$WHITE" "${RESOURCES[$label]}" "$RESET"
+    printf "  ${RED}%-*s${WHITE} %s${RESET}\n" "$MAXLEN" "$label:" "${RESOURCES[$label]}"
 done
