@@ -19,11 +19,13 @@ RESOURCES["Usage of /"]="$DISK_USED"
 RESOURCES["Processes"]="$PROCS"
 RESOURCES["Users logged in"]="$USERS"
 
-# Dynamic alignment
+# Compute longest label
 MAXLEN=0
 for label in "${!RESOURCES[@]}"; do
     [ ${#label} -gt $MAXLEN ] && MAXLEN=${#label}
 done
 
+# Print aligned safely
 for label in "${!RESOURCES[@]}"; do
-    printf "  ${RED}%-${MAXLEN}s${WHITE} %s${RESET}\
+    printf '  %s%-*s%s %s%s\n' "$RED" "$MAXLEN" "$label:" "$WHITE" "${RESOURCES[$label]}" "$RESET"
+done
