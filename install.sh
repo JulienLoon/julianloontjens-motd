@@ -90,26 +90,26 @@ for f in "${UBUNTU_MOTD[@]}"; do
     fi
 done
 
-# --- Disable static Ubuntu MOTD (PAM fallback) ---
-echo -e "${YELLOW}→ Disabling static Ubuntu MOTD (pam_motd fallback)...${RESET}"
+# --- HARD BLOCK Ubuntu help-text (Documentation / Support links) ---
+echo -e "${YELLOW}→ Permanently disabling Ubuntu help text...${RESET}"
 
-if [ -f /etc/motd ]; then
-    truncate -s 0 /etc/motd
-    chattr +i /etc/motd
-    echo "   Locked /etc/motd"
-fi
+HELP_TEXT="/etc/update-motd.d/10-help-text"
 
-if [ -f /etc/motd.tail ]; then
-    truncate -s 0 /etc/motd.tail
-    echo "   Cleared /etc/motd.tail"
-fi
-
-# --- HARD BLOCK landscape (survives updates) ---
-if [ -f "$MOTD_DEST/50-landscape-sysinfo" ]; then
-    echo -e "${YELLOW}→ Permanently blocking landscape sysinfo...${RESET}"
+if [ -f "$HELP_TEXT" ]; then
     dpkg-divert --quiet --local --rename \
-        --divert /etc/update-motd.d/50-landscape-sysinfo.disabled \
-        /etc/update-motd.d/50-landscape-sysinfo || true
+        --divert /etc/update-motd.d/10-help-text.ubuntu \
+        "$HELP_TEXT"
+
+    # Replace with empty executable script
+    cat << 'EOF' > "$HELP_TEXT"
+#!/bin/sh
+exit 0
+EOF
+
+    chmod 755 "$HELP_TEXT"
+    chown root:root "$HELP_TEXT"
+
+    echo "   Diverted and neutralized: 10-help-text"
 fi
 
 # --- Done ---
