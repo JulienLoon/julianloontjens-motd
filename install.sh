@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# install.sh – Installer for julianloontjens-motd
-# GitHub: https://github.com/JulienLoon/julianloontjens-motd
+# install.sh – Installer for julianloontjens-motd (v1.6 - Persistent Update Fix)
+# GitHub: https://github.com
 # Author: Julian Loontjens
-# Version: 1.5
+# Version: 1.6 (2026 Edition)
 
 set -e
 
@@ -24,7 +24,7 @@ cat << "EOF"
 / /_/ / /_/ / /____/ // ___ |/ /|  /  / /___/ /_/ / /_/ / /|  / / / /_/ / /___/ /|  /___/ / 
 \____/\____/_____/___/_/  |_/_/ |_/  /_____/\____/\____/_/ |_/ /_/\____/_____/_/ |_//____/ 
 EOF
-echo -e "${RESET}${BOLD}\n      Julian Loontjens MOTD Installer${RESET}\n"
+echo -e "${RESET}${BOLD}\n      Julian Loontjens MOTD Installer (Anti-Update Persistent)${RESET}\n"
 
 # --- Root check ---
 if [[ $EUID -ne 0 ]]; then
@@ -54,23 +54,22 @@ sleep 0.4
 echo -e "${YELLOW}→ Backing up existing MOTD to:${RESET} $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 cp -a "$MOTD_DEST"/* "$BACKUP_DIR"/ 2>/dev/null || true
-sleep 0.4
 
 # --- Install new MOTD files ---
 echo -e "${YELLOW}→ Installing custom MOTD scripts...${RESET}"
 cp -a "$MOTD_SRC"/* "$MOTD_DEST"/
-sleep 0.4
 
-# --- Permissions ---
+# --- Permissions for your scripts ---
 echo -e "${YELLOW}→ Setting permissions...${RESET}"
 chmod 755 "$MOTD_DEST"/*
 chown root:root "$MOTD_DEST"/*
-sleep 0.3
 
-# --- Disable Ubuntu default MOTD scripts ---
-echo -e "${YELLOW}→ Disabling Ubuntu default MOTD components...${RESET}"
+# --- PERMANENTLY BLOCK Ubuntu default scripts ---
+# We use dpkg-divert so that updates don't overwrite or restore these files.
+echo -e "${YELLOW}→ Permanently disabling Ubuntu default components...${RESET}"
 
 UBUNTU_MOTD=(
+  10-help-text
   50-landscape-sysinfo
   50-motd-news
   90-updates-available
@@ -84,32 +83,30 @@ UBUNTU_MOTD=(
 )
 
 for f in "${UBUNTU_MOTD[@]}"; do
-    if [ -f "$MOTD_DEST/$f" ]; then
-        chmod -x "$MOTD_DEST/$f"
-        echo "   Disabled: $f"
-    fi
-done
-
-# --- HARD BLOCK Ubuntu help-text (Documentation / Support links) ---
-echo -e "${YELLOW}→ Permanently disabling Ubuntu help text...${RESET}"
-
-HELP_TEXT="/etc/update-motd.d/10-help-text"
-
-if [ -f "$HELP_TEXT" ]; then
-    dpkg-divert --quiet --local --rename \
-        --divert /etc/update-motd.d/10-help-text.ubuntu \
-        "$HELP_TEXT"
-
-    # Replace with empty executable script
-    cat << 'EOF' > "$HELP_TEXT"
+    FILE_PATH="$MOTD_DEST/$f"
+    if [ -f "$FILE_PATH" ]; then
+        # If no divert exists for this file, create one
+        if ! dpkg-divert --list | grep -q "$FILE_PATH"; then
+            dpkg-divert --quiet --local --rename --divert "$FILE_PATH.ubuntu" "$FILE_PATH"
+            
+            # Create an empty dummy script that does nothing
+            cat << 'EOF' > "$FILE_PATH"
 #!/bin/sh
 exit 0
 EOF
+            chmod 755 "$FILE_PATH"
+            chown root:root "$FILE_PATH"
+            echo "   Diverted and neutralized: $f"
+        else
+            echo "   Already neutralized: $f"
+        fi
+    fi
+done
 
-    chmod 755 "$HELP_TEXT"
-    chown root:root "$HELP_TEXT"
-
-    echo "   Diverted and neutralized: 10-help-text"
+# Extra: Clear the "Legal" text that sometimes appears above the MOTD
+if [ -f /etc/legal ]; then
+    cat /dev/null > /etc/legal
+    echo "   Cleared /etc/legal"
 fi
 
 # --- Done ---
@@ -121,11 +118,12 @@ echo -e "Backup directory: ${YELLOW}${BACKUP_DIR}${RESET}\n"
 read -p "Would you like to preview the MOTD now? (y/n) " -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "\n${CYAN}────────── MOTD PREVIEW ──────────${RESET}\n"
+    # Force regeneration for preview
     run-parts /etc/update-motd.d/
     echo -e "\n${CYAN}──────────────────────────────────${RESET}\n"
 fi
 
 echo -e "${BOLD}Installation finished.${RESET}"
-echo -e "Press any key to continue..."
+echo -e "Press any key to exit..."
 read -n 1 -s
 clear
