@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # uninstall.sh – Uninstaller for julianloontjens-motd
-# Restores the previous /etc/update-motd.d configuration
+# GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.5
+# Version: 1.7
 
 set -e
 
@@ -50,16 +50,32 @@ fi
 echo -e "${CYAN}▶ Starting MOTD uninstallation...${RESET}"
 sleep 0.4
 
-# --- Remove dpkg-divert (restore Ubuntu default) ---
-if dpkg-divert --list | grep -q "50-landscape-sysinfo"; then
-    echo -e "${YELLOW}→ Removing dpkg-divert for landscape sysinfo...${RESET}"
-    dpkg-divert --quiet --remove \
-        --divert /etc/update-motd.d/50-landscape-sysinfo.disabled \
-        /etc/update-motd.d/50-landscape-sysinfo || true
-    sleep 0.3
-fi
+# --- Restore Ubuntu default MOTD scripts using dpkg-divert remove ---
+UBUNTU_MOTD=(
+  10-help-text
+  50-landscape-sysinfo
+  50-motd-news
+  90-updates-available
+  91-contract-ua-esm-status
+  91-release-upgrade
+  92-unattended-upgrades
+  95-hwe-eol
+  97-overlayroot
+  98-fsck-at-reboot
+  98-reboot-required
+)
 
-# --- Clear current MOTD ---
+for f in "${UBUNTU_MOTD[@]}"; do
+    SCRIPT_PATH="$MOTD_DIR/$f"
+    DIVERTED=$(dpkg-divert --list 2>/dev/null | grep "$SCRIPT_PATH" || true)
+    if [[ -n "$DIVERTED" ]]; then
+        echo -e "${YELLOW}→ Removing dpkg-divert for $f...${RESET}"
+        dpkg-divert --quiet --remove --divert "$SCRIPT_PATH.ubuntu" "$SCRIPT_PATH" || true
+    fi
+done
+sleep 0.3
+
+# --- Remove current MOTD scripts ---
 echo -e "${YELLOW}→ Removing current MOTD scripts...${RESET}"
 rm -f "${MOTD_DIR}"/* 2>/dev/null || true
 sleep 0.4
@@ -70,6 +86,17 @@ cp -a "${LATEST_BACKUP}/"* "${MOTD_DIR}/"
 chmod 755 "${MOTD_DIR}"/*
 chown root:root "${MOTD_DIR}"/*
 sleep 0.4
+
+# --- Reinstall landscape-common to restore default MOTD behavior ---
+echo -e "${YELLOW}→ Reinstalling landscape-common to restore default Ubuntu MOTD behavior...${RESET}"
+if ! dpkg -l | grep -q landscape-common; then
+    apt-get update
+    apt-get install -y landscape-common
+    echo "   landscape-common reinstalled."
+else
+    echo "   landscape-common already installed."
+fi
+sleep 0.3
 
 echo
 echo -e "${GREEN}✓ Restoration complete!${RESET}"
