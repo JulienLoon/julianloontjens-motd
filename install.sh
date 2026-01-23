@@ -90,6 +90,20 @@ for f in "${UBUNTU_MOTD[@]}"; do
     fi
 done
 
+# --- Disable static Ubuntu MOTD (PAM fallback) ---
+echo -e "${YELLOW}→ Disabling static Ubuntu MOTD (pam_motd fallback)...${RESET}"
+
+if [ -f /etc/motd ]; then
+    truncate -s 0 /etc/motd
+    chattr +i /etc/motd
+    echo "   Locked /etc/motd"
+fi
+
+if [ -f /etc/motd.tail ]; then
+    truncate -s 0 /etc/motd.tail
+    echo "   Cleared /etc/motd.tail"
+fi
+
 # --- HARD BLOCK landscape (survives updates) ---
 if [ -f "$MOTD_DEST/50-landscape-sysinfo" ]; then
     echo -e "${YELLOW}→ Permanently blocking landscape sysinfo...${RESET}"
