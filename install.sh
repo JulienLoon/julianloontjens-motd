@@ -3,7 +3,7 @@
 # install.sh – Installer for julianloontjens-motd
 # GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.4
+# Version: 1.5
 
 set -e
 
@@ -30,7 +30,6 @@ echo -e "${RESET}${BOLD}\n      Julian Loontjens MOTD Installer${RESET}\n"
 if [[ $EUID -ne 0 ]]; then
     echo -e "${RED}✗ This script must be run as root.${RESET}"
     echo "Try: sudo ./install.sh"
-    echo
     read -n 1 -s -r -p "Press any key to exit..."
     exit 1
 fi
@@ -40,10 +39,10 @@ MOTD_SRC="$(pwd)/motd"
 MOTD_DEST="/etc/update-motd.d"
 BACKUP_DIR="/etc/update-motd.d.backup-$(date +%Y%m%d-%H%M%S)"
 
-# --- Check motd folder ---
+# --- Verify source ---
 if [ ! -d "$MOTD_SRC" ]; then
     echo -e "${RED}✗ Error: motd/ directory not found.${RESET}"
-    echo "Run this script from the root of the cloned repository."
+    echo "Run this script from the root of the repository."
     read -n 1 -s -r -p "Press any key to exit..."
     exit 1
 fi
@@ -51,41 +50,53 @@ fi
 echo -e "${CYAN}▶ Starting installation...${RESET}"
 sleep 0.4
 
-# --- Backup current MOTD ---
+# --- Backup existing MOTD ---
 echo -e "${YELLOW}→ Backing up existing MOTD to:${RESET} $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 cp -a "$MOTD_DEST"/* "$BACKUP_DIR"/ 2>/dev/null || true
 sleep 0.4
 
-# --- Install new files ---
-echo -e "${YELLOW}→ Installing new MOTD scripts...${RESET}"
+# --- Install new MOTD files ---
+echo -e "${YELLOW}→ Installing custom MOTD scripts...${RESET}"
 cp -a "$MOTD_SRC"/* "$MOTD_DEST"/
 sleep 0.4
 
-# --- Set permissions ---
+# --- Permissions ---
 echo -e "${YELLOW}→ Setting permissions...${RESET}"
 chmod 755 "$MOTD_DEST"/*
 chown root:root "$MOTD_DEST"/*
 sleep 0.3
 
-# --- Disable non-Julian files ---
-echo -e "${YELLOW}→ Disabling other MOTD scripts...${RESET}"
+# --- Disable Ubuntu default MOTD scripts ---
+echo -e "${YELLOW}→ Disabling Ubuntu default MOTD components...${RESET}"
 
-ALLOWED=(
-    "00-header"
-    "01-system-info"
-    "02-resources"
-    "03-network"
-    "10-footer"
+UBUNTU_MOTD=(
+  50-landscape-sysinfo
+  50-motd-news
+  90-updates-available
+  91-contract-ua-esm-status
+  91-release-upgrade
+  92-unattended-upgrades
+  95-hwe-eol
+  97-overlayroot
+  98-fsck-at-reboot
+  98-reboot-required
 )
 
-for FILE in "$MOTD_DEST"/*; do
-    BASENAME=$(basename "$FILE")
-    if [[ ! " ${ALLOWED[*]} " =~ " ${BASENAME} " ]]; then
-        chmod -x "$FILE" 2>/dev/null || true
-        echo "   Disabled: $BASENAME"
+for f in "${UBUNTU_MOTD[@]}"; do
+    if [ -f "$MOTD_DEST/$f" ]; then
+        chmod -x "$MOTD_DEST/$f"
+        echo "   Disabled: $f"
     fi
 done
+
+# --- HARD BLOCK landscape (survives updates) ---
+if [ -f "$MOTD_DEST/50-landscape-sysinfo" ]; then
+    echo -e "${YELLOW}→ Permanently blocking landscape sysinfo...${RESET}"
+    dpkg-divert --quiet --local --rename \
+        --divert /etc/update-motd.d/50-landscape-sysinfo.disabled \
+        /etc/update-motd.d/50-landscape-sysinfo || true
+fi
 
 # --- Done ---
 echo
