@@ -7,6 +7,12 @@
 
 set -e
 
+# --- Non-interactive detection ---
+NON_INTERACTIVE=0
+if [[ "$1" == "--non-interactive" ]]; then
+    NON_INTERACTIVE=1
+fi
+
 # --- Colors ---
 BOLD="\033[1m"
 CYAN="\033[36m"
@@ -15,7 +21,9 @@ GREEN="\033[32m"
 RED="\033[31m"
 RESET="\033[0m"
 
-clear
+# --- Clear screen (interactive only) ---
+[[ $NON_INTERACTIVE -eq 0 ]] && clear
+
 echo -e "${CYAN}"
 cat << "EOF"
        ____  ____    _______    _   __   __    ____  ____  _   ________  _________   _______
@@ -30,7 +38,9 @@ echo -e "${RESET}${BOLD}\n      Julian Loontjens MOTD Installer${RESET}\n"
 if [[ $EUID -ne 0 ]]; then
     echo -e "${RED}✗ This script must be run as root.${RESET}"
     echo "Try: sudo ./install.sh"
-    read -n 1 -s -r -p "Press any key to exit..."
+    if [[ $NON_INTERACTIVE -eq 0 ]]; then
+        read -n 1 -s -r -p "Press any key to exit..."
+    fi
     exit 1
 fi
 
@@ -53,7 +63,9 @@ BACKUP_DIR="/etc/update-motd.d.backup-$(date +%Y%m%d-%H%M%S)"
 if [ ! -d "$MOTD_SRC" ]; then
     echo -e "${RED}✗ Error: motd/ directory not found.${RESET}"
     echo "Run this script from the root of the repository."
-    read -n 1 -s -r -p "Press any key to exit..."
+    if [[ $NON_INTERACTIVE -eq 0 ]]; then
+        read -n 1 -s -r -p "Press any key to exit..."
+    fi
     exit 1
 fi
 
@@ -127,12 +139,21 @@ echo
 echo -e "${GREEN}✓ Installation complete!${RESET}"
 echo -e "Backup directory: ${YELLOW}${BACKUP_DIR}${RESET}\n"
 
-# --- Preview ---
-read -p "Would you like to preview the MOTD now? (y/n) " -r
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "\n${CYAN}────────── MOTD PREVIEW ──────────${RESET}\n"
-    run-parts /etc/update-motd.d/
-    echo -e "\n${CYAN}──────────────────────────────────${RESET}\n"
+# --- Preview (interactive only) ---
+if [[ $NON_INTERACTIVE -eq 0 ]]; then
+    read -p "Would you like to preview the MOTD now? (y/n) " -r
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "\n${CYAN}────────── MOTD PREVIEW ──────────${RESET}\n"
+        run-parts /etc/update-motd.d/
+        echo -e "\n${CYAN}──────────────────────────────────${RESET}\n"
+    fi
+fi
+
+# --- Non-interactive completion message ---
+if [[ $NON_INTERACTIVE -eq 1 ]]; then
+    echo "MOTD installation completed successfully."
+    echo "Backup directory: $BACKUP_DIR"
+    exit 0
 fi
 
 echo -e "${BOLD}Installation finished.${RESET}"
