@@ -3,7 +3,7 @@
 # install.sh – Installer for julianloontjens-motd
 # GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.5
+# Version: 1.6
 
 set -e
 

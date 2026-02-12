@@ -3,7 +3,7 @@
 # uninstall.sh – Uninstaller for julianloontjens-motd
 # GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.7
+# Version: 1.8
 
 set -e
 
@@ -36,25 +36,85 @@ fi
 
 # --- Paths ---
 MOTD_DIR="/etc/update-motd.d"
-
-# --- Find latest backup ---
-LATEST_BACKUP=$(ls -td /etc/update-motd.d.backup-* 2>/dev/null | head -n 1 || true)
-
-if [[ -z "$LATEST_BACKUP" ]]; then
-    echo -e "${RED}✗ No backup found.${RESET}"
-    echo "Nothing to restore."
-    read -n 1 -s -r -p "Press any key to exit..."
-    exit 1
-fi
+DEFAULT_MOTD_SRC="$(pwd)/default-ubuntu-motd"
 
 echo -e "${CYAN}▶ Starting MOTD uninstallation...${RESET}"
 sleep 0.4
 
-# --- Restore Ubuntu default MOTD scripts using dpkg-divert remove ---
+# --- Remove dpkg-divert for 10-help-text ---
+HELP_TEXT="$MOTD_DIR/10-help-text"
+DIVERTED=$(dpkg-divert --list 2>/dev/null | grep "$HELP_TEXT" || true)
+if [[ -n "$DIVERTED" ]]; then
+    echo -e "${YELLOW}→ Removing dpkg-divert for 10-help-text...${RESET}"
+    dpkg-divert --quiet --remove --rename "$HELP_TEXT" 2>/dev/null || true
+    sleep 0.3
+fi
+
+# --- Strategy 1: Try to restore from repo's default-ubuntu-motd ---
+if [ -d "$DEFAULT_MOTD_SRC" ]; then
+    echo -e "${YELLOW}→ Restoring default Ubuntu MOTD from repository...${RESET}"
+    
+    # Remove current MOTD scripts
+    rm -f "${MOTD_DIR}"/* 2>/dev/null || true
+    
+    # Copy default Ubuntu MOTD from repo
+    cp -a "$DEFAULT_MOTD_SRC"/* "$MOTD_DIR"/
+    chmod 755 "$MOTD_DIR"/*
+    chown root:root "$MOTD_DIR"/*
+    
+    echo "   Restored from: $DEFAULT_MOTD_SRC"
+    sleep 0.4
+    
+    RESTORE_METHOD="repository defaults"
+
+# --- Strategy 2: Fallback to latest backup ---
+else
+    echo -e "${YELLOW}→ default-ubuntu-motd not found in repo.${RESET}"
+    echo -e "${YELLOW}→ Attempting to restore from backup...${RESET}"
+    
+    LATEST_BACKUP=$(ls -td /etc/update-motd.d.backup-* 2>/dev/null | head -n 1 || true)
+    
+    if [[ -z "$LATEST_BACKUP" ]]; then
+        echo -e "${RED}✗ No backup found and no default-ubuntu-motd directory.${RESET}"
+        echo "Cannot restore MOTD."
+        read -n 1 -s -r -p "Press any key to exit..."
+        exit 1
+    fi
+    
+    # Remove current MOTD scripts
+    rm -f "${MOTD_DIR}"/* 2>/dev/null || true
+    
+    # Restore from backup
+    cp -a "${LATEST_BACKUP}/"* "${MOTD_DIR}/"
+    chmod 755 "${MOTD_DIR}"/*
+    chown root:root "${MOTD_DIR}"/*
+    
+    echo "   Restored from: $LATEST_BACKUP"
+    sleep 0.4
+    
+    RESTORE_METHOD="backup: $LATEST_BACKUP"
+fi
+
+# --- Reinstall landscape-common to restore default Ubuntu MOTD behavior ---
+echo -e "${YELLOW}→ Reinstalling landscape-common to restore default Ubuntu MOTD behavior...${RESET}"
+if ! dpkg -l | grep -q landscape-common; then
+    apt-get update -qq
+    apt-get install -y landscape-common
+    echo "   landscape-common reinstalled."
+else
+    echo "   landscape-common already installed."
+fi
+sleep 0.3
+
+# --- Re-enable all Ubuntu MOTD scripts ---
+echo -e "${YELLOW}→ Re-enabling Ubuntu default MOTD scripts...${RESET}"
+
 UBUNTU_MOTD=(
+  00-header
   10-help-text
   50-landscape-sysinfo
   50-motd-news
+  85-fwupd
   90-updates-available
   91-contract-ua-esm-status
   91-release-upgrade
@@ -66,41 +126,16 @@ UBUNTU_MOTD=(
 )
 
 for f in "${UBUNTU_MOTD[@]}"; do
-    SCRIPT_PATH="$MOTD_DIR/$f"
-    DIVERTED=$(dpkg-divert --list 2>/dev/null | grep "$SCRIPT_PATH" || true)
-    if [[ -n "$DIVERTED" ]]; then
-        echo -e "${YELLOW}→ Removing dpkg-divert for $f...${RESET}"
-        dpkg-divert --quiet --remove --divert "$SCRIPT_PATH.ubuntu" "$SCRIPT_PATH" || true
+    if [ -f "$MOTD_DIR/$f" ]; then
+        chmod +x "$MOTD_DIR/$f"
+        echo "   Enabled: $f"
     fi
 done
 sleep 0.3
 
-# --- Remove current MOTD scripts ---
-echo -e "${YELLOW}→ Removing current MOTD scripts...${RESET}"
-rm -f "${MOTD_DIR}"/* 2>/dev/null || true
-sleep 0.4
-
-# --- Restore backup ---
-echo -e "${YELLOW}→ Restoring backup from:${RESET} ${LATEST_BACKUP}"
-cp -a "${LATEST_BACKUP}/"* "${MOTD_DIR}/"
-chmod 755 "${MOTD_DIR}"/*
-chown root:root "${MOTD_DIR}"/*
-sleep 0.4
-
-# --- Reinstall landscape-common to restore default MOTD behavior ---
-echo -e "${YELLOW}→ Reinstalling landscape-common to restore default Ubuntu MOTD behavior...${RESET}"
-if ! dpkg -l | grep -q landscape-common; then
-    apt-get update
-    apt-get install -y landscape-common
-    echo "   landscape-common reinstalled."
-else
-    echo "   landscape-common already installed."
-fi
-sleep 0.3
-
 echo
 echo -e "${GREEN}✓ Restoration complete!${RESET}"
-echo -e "Backup used: ${YELLOW}${LATEST_BACKUP}${RESET}\n"
+echo -e "Restore method: ${YELLOW}${RESTORE_METHOD}${RESET}\n"
 
 # --- Preview ---
 read -p "Would you like to preview the restored MOTD? (y/n) " -r
