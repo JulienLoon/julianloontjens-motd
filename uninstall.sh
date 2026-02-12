@@ -3,7 +3,7 @@
 # uninstall.sh – Uninstaller for julianloontjens-motd
 # GitHub: https://github.com/JulienLoon/julianloontjens-motd
 # Author: Julian Loontjens
-# Version: 1.7
+# Version: 1.8
 
 set -e
 
@@ -50,7 +50,7 @@ fi
 echo -e "${CYAN}▶ Starting MOTD uninstallation...${RESET}"
 sleep 0.4
 
-# --- Restore Ubuntu default MOTD scripts using dpkg-divert remove ---
+# --- Remove dpkg-divert entries first ---
 UBUNTU_MOTD=(
   10-help-text
   50-landscape-sysinfo
@@ -65,42 +65,115 @@ UBUNTU_MOTD=(
   98-reboot-required
 )
 
+echo -e "${YELLOW}→ Removing dpkg-divert entries...${RESET}"
 for f in "${UBUNTU_MOTD[@]}"; do
     SCRIPT_PATH="$MOTD_DIR/$f"
     DIVERTED=$(dpkg-divert --list 2>/dev/null | grep "$SCRIPT_PATH" || true)
     if [[ -n "$DIVERTED" ]]; then
-        echo -e "${YELLOW}→ Removing dpkg-divert for $f...${RESET}"
-        dpkg-divert --quiet --remove --divert "$SCRIPT_PATH.ubuntu" "$SCRIPT_PATH" || true
+        echo "   Removing divert for $f"
+        dpkg-divert --quiet --remove --rename "$SCRIPT_PATH" 2>/dev/null || true
     fi
 done
 sleep 0.3
 
-# --- Remove current MOTD scripts ---
-echo -e "${YELLOW}→ Removing current MOTD scripts...${RESET}"
-rm -f "${MOTD_DIR}"/* 2>/dev/null || true
+# --- Clean MOTD directory completely ---
+echo -e "${YELLOW}→ Cleaning current MOTD directory...${RESET}"
+rm -rf "${MOTD_DIR}"
+mkdir -p "${MOTD_DIR}"
+chmod 755 "${MOTD_DIR}"
 sleep 0.4
 
 # --- Restore backup ---
 echo -e "${YELLOW}→ Restoring backup from:${RESET} ${LATEST_BACKUP}"
-cp -a "${LATEST_BACKUP}/"* "${MOTD_DIR}/"
-chmod 755 "${MOTD_DIR}"/*
-chown root:root "${MOTD_DIR}"/*
+cp -a "${LATEST_BACKUP}/"* "${MOTD_DIR}/" 2>/dev/null || true
+chmod 755 "${MOTD_DIR}"/* 2>/dev/null || true
+chown root:root "${MOTD_DIR}"/* 2>/dev/null || true
 sleep 0.4
 
-# --- Reinstall landscape-common to restore default MOTD behavior ---
-echo -e "${YELLOW}→ Reinstalling landscape-common to restore default Ubuntu MOTD behavior...${RESET}"
-if ! dpkg -l | grep -q landscape-common; then
-    apt-get update
-    apt-get install -y landscape-common
-    echo "   landscape-common reinstalled."
+# --- Reinstall packages to restore default Ubuntu MOTD scripts ---
+echo -e "${YELLOW}→ Reinstalling Ubuntu packages to restore default MOTD scripts...${RESET}"
+
+# Update package list
+apt-get update -qq
+
+# Reinstall base-files (contains 10-help-text and other core scripts)
+echo "   Reinstalling base-files..."
+apt-get install --reinstall -y base-files 2>/dev/null || true
+
+# Reinstall update-notifier-common (contains update notifications)
+echo "   Reinstalling update-notifier-common..."
+apt-get install --reinstall -y update-notifier-common 2>/dev/null || true
+
+# Reinstall landscape-common (contains landscape-sysinfo)
+if dpkg -l | grep -q landscape-common 2>/dev/null; then
+    echo "   Reinstalling landscape-common..."
+    apt-get install --reinstall -y landscape-common 2>/dev/null || true
 else
-    echo "   landscape-common already installed."
+    echo "   Installing landscape-common..."
+    apt-get install -y landscape-common 2>/dev/null || true
 fi
+
+# Reinstall ubuntu-advantage-tools (contains UA/ESM scripts)
+if dpkg -l | grep -q ubuntu-pro-client 2>/dev/null; then
+    echo "   Reinstalling ubuntu-pro-client..."
+    apt-get install --reinstall -y ubuntu-pro-client 2>/dev/null || true
+elif dpkg -l | grep -q ubuntu-advantage-tools 2>/dev/null; then
+    echo "   Reinstalling ubuntu-advantage-tools..."
+    apt-get install --reinstall -y ubuntu-advantage-tools 2>/dev/null || true
+fi
+
+# Reinstall unattended-upgrades if present
+if dpkg -l | grep -q unattended-upgrades 2>/dev/null; then
+    echo "   Reinstalling unattended-upgrades..."
+    apt-get install --reinstall -y unattended-upgrades 2>/dev/null || true
+fi
+
 sleep 0.3
+
+# --- Verify critical scripts exist, if not create minimal versions ---
+echo -e "${YELLOW}→ Verifying critical MOTD scripts...${RESET}"
+
+# 10-help-text
+if [[ ! -f "$MOTD_DIR/10-help-text" ]]; then
+    echo "   Creating 10-help-text..."
+    cat > "$MOTD_DIR/10-help-text" << 'HELPEOF'
+#!/bin/sh
+printf "\n"
+printf " * Documentation:  https://help.ubuntu.com\n"
+printf " * Management:     https://landscape.canonical.com\n"
+printf " * Support:        https://ubuntu.com/pro\n"
+printf "\n"
+HELPEOF
+    chmod 755 "$MOTD_DIR/10-help-text"
+fi
+
+# 50-landscape-sysinfo
+if [[ ! -f "$MOTD_DIR/50-landscape-sysinfo" ]] && command -v landscape-sysinfo &> /dev/null; then
+    echo "   Creating 50-landscape-sysinfo..."
+    cat > "$MOTD_DIR/50-landscape-sysinfo" << 'LANDEOF'
+#!/bin/sh
+[ -x /usr/bin/landscape-sysinfo ] && /usr/bin/landscape-sysinfo
+LANDEOF
+    chmod 755 "$MOTD_DIR/50-landscape-sysinfo"
+fi
+
+# 50-motd-news
+if [[ ! -f "$MOTD_DIR/50-motd-news" ]]; then
+    echo "   Creating 50-motd-news..."
+    cat > "$MOTD_DIR/50-motd-news" << 'NEWSEOF'
+#!/bin/sh
+MOTD_DISABLE=1
+[ -r /etc/default/motd-news ] && . /etc/default/motd-news
+[ "$ENABLED" = "1" ] && [ -x /usr/lib/ubuntu-advantage/motd-news ] && exec /usr/lib/ubuntu-advantage/motd-news
+exit 0
+NEWSEOF
+    chmod 755 "$MOTD_DIR/50-motd-news"
+fi
 
 echo
 echo -e "${GREEN}✓ Restoration complete!${RESET}"
-echo -e "Backup used: ${YELLOW}${LATEST_BACKUP}${RESET}\n"
+echo -e "Backup used: ${YELLOW}${LATEST_BACKUP}${RESET}"
+echo -e "Packages reinstalled for full MOTD functionality\n"
 
 # --- Preview ---
 read -p "Would you like to preview the restored MOTD? (y/n) " -r
