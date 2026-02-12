@@ -1,0 +1,8 @@
+#!/bin/sh
+# This file is sourced by pam_motd to display the motd text
+# (see /etc/pam.d/sshd and /etc/pam.d/login)
+
+printf " * Documentation:  https://help.ubuntu.com\n"
+printf " * Management:     https://landscape.canonical.com\n"
+printf " * Support:        https://ubuntu.com/advantage\n"
+printf "\n"
