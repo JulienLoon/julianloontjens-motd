@@ -45,7 +45,8 @@ fi
 sleep 0.3
 
 # --- Paths ---
-MOTD_SRC="$(pwd)/motd"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MOTD_SRC="$SCRIPT_DIR/motd"
 MOTD_DEST="/etc/update-motd.d"
 BACKUP_DIR="/etc/update-motd.d.backup-$(date +%Y%m%d-%H%M%S)"
 
